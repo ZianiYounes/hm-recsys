@@ -1,0 +1,32 @@
+name: two_tower           # nom du retriever (cache, MLflow, features du ranker)
+seed: 42
+
+data:
+  train_weeks: 12            # semaines de positifs utilisees pour l'entrainement
+  max_history: 32            # derniers achats vus par la tour client
+  candidate_pool_weeks: 12   # on ne recommande que des articles vendus recemment
+
+model:
+  user_encoder: attention  # attention | transformer (voir sasrec.yaml)
+  multimodal: false        # true apres la Phase 3 (embeddings FashionCLIP)
+  mm_dim: 64
+  id_dim: 64                 # embedding de l'identifiant article
+  cat_dim: 16                # embedding de chaque attribut article
+  product_code_dim: 32       # le "modele" (toutes couleurs confondues)
+  user_feat_dim: 8           # embedding de chaque feature client
+  hidden_dim: 512
+  out_dim: 128               # dimension de l'espace commun client / article
+  dropout: 0.1
+
+train:
+  epochs: 5
+  batch_size: 4096
+  lr: 0.002
+  weight_decay: 0.000001
+  temperature: 0.05
+  grad_clip: 1.0
+
+eval:
+  k: 100
+  user_batch: 8192
+  item_chunk: 2048

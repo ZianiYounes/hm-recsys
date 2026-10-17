@@ -1,0 +1,16 @@
+competition: h-and-m-personalized-fashion-recommendations
+
+raw_files:
+  - articles.csv
+  - customers.csv
+  - transactions_train.csv
+
+# Les images (~25 Go) ne servent qu'a la Phase 3 (multimodal)
+download_images: false
+
+split:
+  # week = nombre de semaines avant la derniere date (week 0 = 7 derniers jours)
+  test_week: 0
+  val_week: 1
+  # null = tout l'historique ; sinon nombre de semaines gardees avant la semaine cible
+  history_weeks: null

@@ -1,0 +1,3 @@
+torch_threads: 4            # threads CPU pour encoder un client a la volee
+sample_min_purchases: 5      # clients proposes par /customers/sample (assez d'historique)
+history_limit: 12            # achats affiches par defaut

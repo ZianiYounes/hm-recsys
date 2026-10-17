@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hm-recsys"
+version = "0.1.0"
+description = "Systeme de recommandation deep learning a grande echelle (H&M)"
+requires-python = ">=3.11"
+# Les dependances sont dans requirements.txt (torch nightly installe a part)
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

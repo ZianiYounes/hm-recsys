@@ -1,0 +1,28 @@
+# Environnement
+.venv/
+.env
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+
+# Donnees et artefacts lourds (jamais sur GitHub)
+data/**
+!data/**/.gitkeep
+artifacts/**
+!artifacts/**/.gitkeep
+mlruns/
+mlartifacts/
+runs/
+
+# IDE / OS
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
+logs/
+mlflow.db

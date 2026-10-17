@@ -1,0 +1,16 @@
+ks: [12, 50, 100]        # K pour Recall / NDCG / HitRate (MAP toujours a 12)
+
+popularity:
+  n_weeks: 1             # ventes de la derniere semaine d'historique
+  top_n: 100
+
+repurchase:
+  n_weeks: 8
+  max_per_user: 100
+
+cooccurrence:
+  n_weeks: 4             # fenetre pour construire la table A -> B
+  max_items_per_user: 30
+  top_n: 20              # voisins gardes par article
+  source_n_weeks: 8      # fenetre des articles sources du client
+  source_items: 5
