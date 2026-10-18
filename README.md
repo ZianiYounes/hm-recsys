@@ -8,16 +8,18 @@ A two-stage recommendation system trained on 31.8 million real transactions from
 
 Offline evaluation on a held-out week (72,019 customers who made a purchase). Every model only sees data from before that week.
 
-| Model | MAP@12 | Recall@12 | Recall@100 | Hit rate@12 |
-|---|---|---|---|---|
-| Popularity (last week) | 0.0066 | 0.021 | 0.099 | 5.7% |
-| Repurchase | 0.0215 | 0.034 | 0.035 | 6.1% |
-| Rule-based blend | 0.0268 | 0.056 | 0.137 | 10.7% |
-| Two-tower retrieval alone | 0.0151 | 0.041 | 0.143 | 9.4% |
-| Rules + two-tower | 0.0272 | 0.058 | 0.156 | 11.6% |
-| **Two-tower + LightGBM ranker** | **0.0358** | **0.076** | **0.176** | **15.2%** |
+| Model | MAP@12 | Recall@12 | Recall@100 |
+|---|---|---|---|
+| Popularity (last week) | 0.0066 | 0.021 | 0.099 |
+| Repurchase | 0.0215 | 0.034 | 0.035 |
+| Rule-based blend | 0.0268 | 0.056 | 0.137 |
+| Two-tower alone | 0.0154 | 0.042 | 0.148 |
+| SASRec alone | 0.0132 | 0.038 | 0.144 |
+| Rules + two-tower + SASRec | 0.0272 | 0.058 | 0.159 |
+| Two-tower + LightGBM ranker | 0.0359 | 0.076 | 0.177 |
+| **Two-tower + SASRec + FashionCLIP + ranker** | **0.0367** | **0.078** | **0.188** |
 
-The ranker improves MAP@12 by 34% over the best rule-based approach. In plain terms, 15% of customers buy at least one of the 12 articles they are shown.
+The full model improves MAP@12 by 37% over the best rule-based approach, and 15.7% of customers buy at least one of the 12 articles they are shown. Neural retrievers are weaker than the rules on their own, but they surface articles the rules never propose: the share of next-week purchases present in the candidate set rises from 13.7% to 20.0%, and the ranker turns that into better top-12 lists.
 
 ## How it works
 
@@ -28,20 +30,29 @@ flowchart LR
     S --> R2[Co-purchase]
     S --> R3[Popularity]
     S --> R4[Two-tower<br/>PyTorch]
-    S --> R5[SASRec<br/>optional]
-    R1 --> C[~145 candidates<br/>per customer]
+    S --> R5[SASRec<br/>transformer]
+    I[Product photos<br/>and descriptions] --> E[FashionCLIP<br/>embeddings]
+    E --> R4
+    E --> R5
+    E --> F
+    R1 --> C[~180 candidates<br/>per customer]
     R2 --> C
     R3 --> C
     R4 --> C
     R5 --> C
-    C --> F[50 features<br/>per pair]
+    C --> F[54 features<br/>per pair]
     F --> L[LightGBM<br/>LambdaRank]
     L --> O[Top 12]
 ```
 
-**Candidate generation.** A catalogue of 105k articles is too large to score with a heavy model for every customer, so several cheap sources each propose candidates. Three are simple rules. The fourth is a two-tower neural network: one tower encodes a customer from their last 32 purchases (attention pooling over item embeddings, plus recency and profile features), the other encodes an article from its ID and 12 attributes. Both live in the same 128-dimensional space, so retrieval is a nearest-neighbour search. It is trained with an in-batch softmax loss and logQ correction to avoid over-penalising popular items.
+**Candidate generation.** A catalogue of 105k articles is too large to score with a heavy model for every customer, so several cheap sources each propose candidates. Three are simple rules: repurchase, co-purchase and recent popularity. The other two are neural retrievers that embed customers and articles in the same 128-dimensional space, so retrieval is a nearest-neighbour search:
 
-**Ranking.** A LightGBM LambdaRank model orders the candidates using 50 features: the score and rank given by each source, whether the customer already bought the article or the same model in another colour, recent sales and trend of the article, the price relative to the customer's usual spend, and the two-tower similarity. The two strongest signals are the department of the article and how recently the customer bought the same model.
+- a **two-tower** model, where the customer tower pools their last 32 purchases with learned attention and adds recency and profile features;
+- a **SASRec-style transformer** that reads the last 50 purchases in order, so it captures sequences such as jeans followed by a belt.
+
+In both, the article tower combines the article ID, 12 catalogue attributes and a frozen **FashionCLIP** embedding of the product photo and description. The image signal lets a brand-new article be recommended before it has any sales. Both retrievers are trained with an in-batch softmax loss and logQ correction to avoid over-penalising popular items.
+
+**Ranking.** A LightGBM LambdaRank model orders the candidates using 54 features: the score and rank given by each source, whether the customer already bought the article or the same model in another colour, recent sales and trend of the article, the price relative to the customer's usual spend, the similarity from each retriever, and the visual similarity between the article and the customer's recent purchases. The two strongest signals are the department of the article and how recently the customer bought the same model.
 
 **Evaluation protocol.** Weeks are counted backwards from the last day of data. To evaluate week W, retrievers are trained on everything before W, and the ranker is trained on weeks W+1 and W+2 with retrievers that never saw those weeks. Nothing from the evaluated week leaks into training.
 
@@ -49,7 +60,7 @@ flowchart LR
 
 ## Tech stack
 
-PyTorch (nightly, CUDA 12.8), Polars, DuckDB, LightGBM, FAISS, FastAPI, Streamlit, MLflow, Docker, GitHub Actions. Trained on a single RTX 5080 laptop GPU: about 2 minutes per two-tower model and 30 seconds for the ranker.
+PyTorch (nightly, CUDA 12.8), Polars, DuckDB, LightGBM, FAISS, FastAPI, Streamlit, MLflow, Docker, GitHub Actions. Trained on a single RTX 5080 laptop GPU: about 2 minutes for the two-tower, 6 minutes for SASRec, 7 minutes to embed 105k product photos and about a minute for the ranker.
 
 ## Getting started
 
@@ -60,15 +71,17 @@ Requirements: Python 3.11+, an NVIDIA GPU for training (serving runs on CPU), an
 ./setup_venv.ps1
 pip install -e .
 
-# Data
+# Data (about 30 GB with product photos)
 kaggle auth login
-python scripts/run_download.py
+python scripts/run_download.py --images
 python scripts/run_preprocess.py
 python scripts/run_split.py
+python scripts/run_embeddings.py
 
 # Models (validation week)
 python scripts/run_baselines.py
 python scripts/run_train.py --model two_tower
+python scripts/run_train.py --model sasrec
 python scripts/run_train.py --model ranker
 
 # Serving
@@ -107,15 +120,14 @@ app/                Streamlit demo
 tests/              unit tests and an end-to-end API test on synthetic data
 ```
 
-## Going further
+## Configuration
 
-- `python scripts/run_train.py --model sasrec` trains a transformer sequence encoder (SASRec style) as a second retriever. Add it to `retrievers` in `configs/ranker.yaml` to use it in the ranker and the API.
-- `scripts/run_embeddings.py` computes FashionCLIP embeddings from product photos and descriptions. They can feed the item tower (`multimodal: true`) and add a visual similarity feature to the ranker, which helps with new articles that have no sales yet.
-- Every run is tracked in MLflow (`mlflow server --backend-store-uri sqlite:///mlflow.db`).
+- Retrievers used by the ranker and the API are listed in `configs/ranker.yaml` (`retrievers`). A lighter setup with the two-tower only reaches MAP@12 0.0359 without downloading the photos: set `multimodal: false` in the retriever configs and `use_clip_features: false` in the ranker config.
+- Every run is tracked in MLflow (`mlflow server --backend-store-uri sqlite:///mlflow.db --workers 1`).
 
 ## Résumé en français
 
-Système de recommandation en deux étages sur les données réelles de H&M. Des sources rapides (règles métier et réseau two-tower en PyTorch) proposent environ 145 candidats par client, puis un modèle LightGBM LambdaRank les classe à partir de 50 variables. Le MAP@12 passe de 0.0268 avec les règles seules à 0.0358, soit +34 %. Les recommandations sont servies par une API FastAPI avec un index FAISS, et une démo Streamlit permet de les explorer.
+Système de recommandation en deux étages sur les données réelles de H&M. Des règles métier et deux réseaux de neurones en PyTorch (un two-tower et un transformer séquentiel de type SASRec, enrichis par les embeddings FashionCLIP des photos produits) proposent environ 180 candidats par client. Un modèle LightGBM LambdaRank les classe ensuite à partir de 54 variables. Le MAP@12 passe de 0.0268 avec les règles seules à 0.0367, soit +37 %. Les recommandations sont servies par une API FastAPI avec un index FAISS, et une démo Streamlit permet de les explorer.
 
 ## License
 
