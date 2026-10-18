@@ -10,7 +10,7 @@ model:
   user_encoder: transformer
   n_layers: 2
   n_heads: 4
-  multimodal: false        # true apres la Phase 3 (embeddings FashionCLIP)
+  multimodal: true        # true apres la Phase 3 (embeddings FashionCLIP)
   mm_dim: 64
   id_dim: 64                 # embedding de l'identifiant article
   cat_dim: 16                # embedding de chaque attribut article

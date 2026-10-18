@@ -2,10 +2,10 @@ k: 12
 
 # Retrievers neuronaux utilises comme sources de candidats (un fichier configs/<nom>.yaml
 # chacun). Apres la Phase 3 : [two_tower, sasrec]
-retrievers: [two_tower]
+retrievers: [two_tower, sasrec]
 
 # Similarite FashionCLIP client x article (Phase 3, necessite data/embeddings/)
-use_clip_features: false
+use_clip_features: true
 
 # Semaines d'entrainement du ranker, relatives a la semaine evaluee.
 # val (semaine 1) + [1, 2] -> entraine sur les semaines 2 et 3.
